@@ -41,6 +41,9 @@ class EmbedderService extends BaseApplicationComponent
             $this->refresh_cache = $params['cache_minutes'];
         }
 
+        // remove dimensions parameter
+        $remove_dimensions = (isset($params['remove_dimensions'])) ? $params['remove_dimensions'] : false;
+
         // optional YouTube parameters
         $youtube_rel = (isset($params['youtube_rel'])) ? $params['youtube_rel'] : null;
         $youtube_showinfo = (isset($params['youtube_showinfo'])) ? $params['youtube_showinfo'] : null;
@@ -51,7 +54,7 @@ class EmbedderService extends BaseApplicationComponent
         $vimeo_autoplay = (isset($params['vimeo_autoplay']) && $params['vimeo_autoplay'] == "true") ? "&autoplay=true" : "";
         $vimeo_portrait = (isset($params['vimeo_portrait']) && $params['vimeo_portrait'] == "false") ? "&portrait=false" : "";
         $vimeo_api      = (isset($params['vimeo_api']) && $params['vimeo_api'] == "true") ? "&api=1" : "";
-      
+
         $vimeo_color = (isset($params['vimeo_color'])) ? "&color=" . $params['vimeo_color'] : "";
         $vimeo_player_id = (isset($params['vimeo_player_id'])) ? $params['vimeo_player_id'] : "";
         $vimeo_player_id_str = (isset($params['vimeo_player_id'])) ? "&player_id=" . $params['vimeo_player_id'] : "";
@@ -107,13 +110,13 @@ class EmbedderService extends BaseApplicationComponent
         libxml_use_internal_errors(true);
 
         $video_info = simplexml_load_string($video_info);
-        
+
         // gracefully fail if the video is not found
         if($video_info === false)
         {
             return "Video not found";
         }
-            
+
         // inject wmode transparent if required
         if ($wmode === 'transparent' || $wmode === 'opaque' || $wmode === 'window' ) {
             $param_str = '<param name="wmode" value="' . $wmode .'"></param>';
@@ -149,7 +152,7 @@ class EmbedderService extends BaseApplicationComponent
             preg_match('/.*?src="(.*?)".*?/', $video_info->html, $matches);
             if (!empty($matches[1])) $video_info->html = str_replace($matches[1], $matches[1] . '&showinfo=' . $youtube_showinfo, $video_info->html);
         }
-      
+
         // add vimeo player id to iframe if set
         if ($vimeo_player_id!=="") {
             $video_info->html = preg_replace('/<iframe/i', '<iframe id="' . $vimeo_player_id . '"', $video_info->html);
@@ -157,6 +160,12 @@ class EmbedderService extends BaseApplicationComponent
 
         // set the encode html to output properly in Twig
         $charset = craft()->templates->getTwig()->getCharset();
+
+        // Remove width and height if avaialble
+        if ($remove_dimensions) {
+          $video_info->html = preg_replace('/(width|height)="(\d*)"/', '', $video_info->html);
+        }
+
         $twig_html = new \Twig_Markup($video_info->html, $charset);
         //$video_info->html = $twig_html;
 
@@ -206,7 +215,7 @@ class EmbedderService extends BaseApplicationComponent
             return $twig_html;
         }
 
-        // handle full output   
+        // handle full output
         foreach ($plugin_vars as $key => $var)
         {
             if (isset($video_info->$key))
@@ -221,12 +230,13 @@ class EmbedderService extends BaseApplicationComponent
             $tagdata = str_replace("{".$key."}", $value, $tagdata);
         }
 
+
         // replace the embed code with the Twig object
         $tagdata['embed_code'] = $twig_html;
-        
+
         return $tagdata;
 
-    }   
+    }
 
     public function curl($vid_url) {
         // do we have curl?
